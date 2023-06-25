@@ -1,0 +1,116 @@
+#!/bin/dash
+
+if test $# -ge 2 -a $# -le 3
+then
+    has_a=0
+    has_m=0
+
+    files=$(ls ".tigger/index" -1a | sed -E '/^\.(.*)/d' | sed -E '/^index$/d')
+
+    # Check for the -m or -a flag in the arguments
+    for args in "$@"
+    do
+        if test "$args" = "-m" #can't test args that have spaces in them?! Why tho
+        then
+            has_m=1
+        elif test "$args" = "-a"
+        then
+            has_a=1
+        fi
+    done
+
+    # Check for errors with flags
+    if test "$has_m" -eq 0
+    then
+        echo "$0: error: no -m flag for message" 1>&2
+        exit 1
+    fi
+
+    # Check that a message was actually captured
+    for args in "$@"
+    do
+        message=$(echo "$args" | sed -E '/^-.*/d')
+        if test -z "$message"
+        then
+            continue
+        else
+            # message variable now holds the correct message
+            break
+        fi
+    done
+
+    if test -z "$message"
+    then
+        echo "$0: error: no/invalid message" 1>&2
+        exit 1
+    fi
+
+    # Check for -a before continuing
+    if test "$has_a" -eq 1
+    then
+        # check all files are different - if all files are the same, exit
+        curr_dir_is_different=0
+        for file_name in $files
+        do
+            test_dir_is_different=$(diff "$file_name" ".tigger/index/$file_name")
+            if test ! -z "$test_dir_is_different"
+            then
+                curr_dir_is_different=1 # this changes to variable to 1 but not permanently? - BRUH THIS IS EXECUTED IN A SUBSHELL
+            fi
+        done
+
+        # copy all files from current directory into index if there are differences
+        if test "$curr_dir_is_different" -eq 1
+        then
+            echo "$files" |
+            while read -r file_name
+            do
+                if test -f "$file_name"
+                then
+                    cp "$file_name" .tigger/index/"$file_name"
+                fi
+            done
+        else
+            echo "nothing to commit" 1>&2
+            exit 1
+        fi
+    fi
+
+    # Check that index is not the same as the most recent commit
+    commit_no=$(wc -l .tigger/TIGGER_COMMIT_LOG | cut -f1 -d' ')
+    if test "$commit_no" -gt 0
+    then
+        commit_no=$((commit_no - 1))
+
+        test_changes_to_index=$(diff .tigger/commits/commit"$commit_no" .tigger/index)
+        if test -z "$test_changes_to_index"
+        then
+            echo "nothing to commit" 1>&2
+            exit 1
+        fi
+    fi
+
+    # Create commit record in TIGGER_COMMIT_LOG
+    if test "$has_m" -eq 1
+    then
+        commit_no=$(wc -l .tigger/TIGGER_COMMIT_LOG | cut -f1 -d' ')
+        # Append commit record
+        echo "$commit_no" "$message" >> ".tigger/TIGGER_COMMIT_LOG" 
+    fi
+
+    # Commiting files in the index (staging area) to a commit directory
+    mkdir ".tigger/commits/commit$commit_no"
+
+    echo "$files" |
+    while read -r file_name
+    do
+        cp .tigger/index/"$file_name" .tigger/commits/commit"$commit_no"
+    done
+
+    echo "Committed as commit $commit_no"
+    exit 0
+
+else
+    echo "usage: $0 [-a] -m 'message...'" 1>&2
+    exit 1
+fi

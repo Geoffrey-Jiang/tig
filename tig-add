@@ -1,0 +1,32 @@
+#!/bin/dash
+
+if test $# -ge 1
+then
+    if test -d ".tigger"
+    then
+        for file in "$@"
+        do
+            # This check is not working for only alphanumerical characters...
+            test_file_name=$(echo $file | sed -E -n "/^[a-zA-Z0-9][a-zA-Z0-9\.\-\_]*$/p")
+            if test -z "$test_file_name"
+            then
+                echo "$0: error: invalid filename '$file'" 1>&2
+            elif test ! -f "$file"
+            then
+                echo "$0: error: can not open '$file'" 1>&2
+            else
+                cp "$file" ".tigger/index/$file"
+                # echo "Added $file to index"
+            fi
+
+        done
+    else
+        echo "$0: error: tigger repository directory .tigger not found"
+    fi
+
+
+
+else
+    echo "usage: $0 <filenames>" 1>&2
+    exit 1
+fi

@@ -1,0 +1,56 @@
+#!/bin/dash
+
+if test $# -eq 1
+then
+        # Ensure argument input is correctly formatted
+        test_input=$(echo "$1" | sed -E -n '/^.*:.*$/p')
+        if test -z "$test_input"
+        then
+                echo "usage: $0 [commit]:filename"
+                exit 1
+        fi
+
+        # Check for commit and filename
+        commit=$(echo "$1" | sed -E 's/([0-9]*):.*/\1/g')
+        file_name=$(echo "$1" | sed -E 's/[0-9]*:(.*)/\1/g')
+
+        if test -z "$commit"
+        then
+                # commit not specified, print file in index
+                file=".tigger/index/$file_name"
+                if test -f "$file"
+                then
+                        cat "$file"
+                else
+                        echo "$0: error: '$file_name' not found in index" 1>&2
+                        exit 1
+                fi
+        else
+                # check commit number is within range of number of commits
+                no_commits=$(wc -l .tigger/TIGGER_COMMIT_LOG | cut -f1 -d' ')
+
+                # get correct commit_no
+                if test "$commit" -le "$no_commits"
+                then
+                        # use $commit
+                        file=".tigger/commits/commit$commit/$file_name"
+                else
+                        echo "$0: error: unknown commit '$commit'" 1>&2
+                        exit 1
+                fi
+
+                if test -f "$file"
+                then
+                        cat "$file"
+                else
+                        echo "$0: error: '$file_name' not found in commit $commit" 1>&2
+                        exit 1
+                fi
+
+        fi
+
+
+else
+        echo "usage: $0 [commit]:filename"
+        exit 1
+fi
